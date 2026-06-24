@@ -69,7 +69,7 @@ export class ProductController {
       return res.status(201).json({ success: true, data: product });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ success: false, errors: error.errors });
+        return res.status(400).json({ success: false, errors: error.issues });
       }
       return res.status(400).json({ success: false, message: error.message });
     }
@@ -77,7 +77,7 @@ export class ProductController {
 
   async update(req: Request, res: Response) {
     try {
-      const data = await productService.update(req.params.id, req.body);
+      const data = await productService.update(req.params.id as string, req.body);
       return res.json({ success: true, data });
     } catch (error: any) {
       return res.status(400).json({ success: false, message: error.message });
@@ -86,7 +86,7 @@ export class ProductController {
 
   async delete(req: Request, res: Response) {
     try {
-      await productService.delete(req.params.id);
+      await productService.delete(req.params.id as string);
       return res.json({ success: true, message: "Product deleted" });
     } catch (error: any) {
       return res.status(400).json({ success: false, message: error.message });

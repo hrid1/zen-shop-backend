@@ -44,7 +44,7 @@ export class UserController {
       return res.json({ success: true, data: user });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ success: false, errors: error.errors });
+        return res.status(400).json({ success: false, errors: error.issues });
       }
       return res.status(400).json({ success: false, message: error.message });
     }
@@ -67,7 +67,7 @@ export class UserController {
       return res.status(201).json({ success: true, data: address });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ success: false, errors: error.errors });
+        return res.status(400).json({ success: false, errors: error.issues });
       }
       return res.status(400).json({ success: false, message: error.message });
     }
@@ -77,7 +77,7 @@ export class UserController {
   async updateAddress(req: AuthRequest, res: Response) {
     try {
       const data = addressSchema.partial().parse(req.body);
-      const address = await userService.updateAddress(req.user!.userId, req.params.id, data);
+      const address = await userService.updateAddress(req.user!.userId, req.params.id as string, data);
       return res.json({ success: true, data: address });
     } catch (error: any) {
       return res.status(400).json({ success: false, message: error.message });
@@ -87,7 +87,7 @@ export class UserController {
 
    async deleteAddress(req: AuthRequest, res: Response) {
     try {
-      const result = await userService.deleteAddress(req.user!.userId, req.params.id);
+      const result = await userService.deleteAddress(req.user!.userId, req.params.id as string);
       return res.json({ success: true, data: result });
     } catch (error: any) {
       return res.status(400).json({ success: false, message: error.message });

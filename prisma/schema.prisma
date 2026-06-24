@@ -202,3 +202,4 @@ model ProductVariantAttribute {
 
   @@map("product_variant_attributes")
 }
+

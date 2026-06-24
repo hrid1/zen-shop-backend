@@ -19,9 +19,16 @@ const options = {
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'JWT',
+          description: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI1MjI4YjExZC1mODJmLTRlZTEtODlhNy0zOTk5NDU0Mzk1NzMiLCJyb2xlIjoiQURNSU4iLCJpYXQiOjE3ODIyOTI4OTYsImV4cCI6MTc4MjM3OTI5Nn0.MfeYqoRNsnCLjQTgMTsJhTbCqYxAiFH4ywhY5a9DZ0w',
         },
       },
     },
+    // Add global security requirement
+    security: [
+      {
+        bearerAuth: [],
+      },
+    ],
   },
   apis: ['./src/routes/*.ts'],
 };
