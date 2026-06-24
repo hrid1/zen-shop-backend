@@ -81,8 +81,9 @@ model CartItem {
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
-  cart Cart @relation(fields: [cartId], references: [id], onDelete: Cascade)
-
+  cart           Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productVariant ProductVariant @relation(fields: [productVariantId], references: [id]) // ← this was missing
+  
   @@map("cart_items")
 }
 
@@ -110,4 +111,94 @@ enum AddressType {
   SHIPPING
   BILLING
   BOTH
+}
+
+
+model Category {
+  id               String     @id @default(uuid())
+  name             String     @unique
+  slug             String     @unique
+  description      String?
+  parentCategoryId String?    @map("parent_category_id")
+  imageUrl         String?    @map("image_url")
+  isActive         Boolean    @default(true) @map("is_active")
+  displayOrder     Int        @default(0) @map("display_order")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+
+  parentCategory   Category?  @relation("CategoryChildren", fields: [parentCategoryId], references: [id])
+  childCategories  Category[] @relation("CategoryChildren")
+  products         Product[]
+
+  @@map("categories")
+       
+}
+
+model Product {
+  id               String    @id @default(uuid())
+  categoryId       String    @map("category_id")
+  name             String
+  slug             String    @unique
+  description      String
+  shortDescription String?   @map("short_description")
+  sku              String    @unique
+  basePrice        Decimal   @map("base_price") @db.Decimal(10, 2)
+  compareAtPrice   Decimal?  @map("compare_at_price") @db.Decimal(10, 2)
+  isActive         Boolean   @default(true) @map("is_active")
+  isFeatured       Boolean   @default(false) @map("is_featured")
+  metaTitle        String?   @map("meta_title")
+  metaDescription  String?   @map("meta_description")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  category  Category         @relation(fields: [categoryId], references: [id])
+  images    ProductImage[]
+  variants  ProductVariant[]
+
+  @@map("products")
+}
+
+model ProductImage {
+  id           String   @id @default(uuid())
+  productId    String   @map("product_id")
+  imageUrl     String   @map("image_url")
+  altText      String?  @map("alt_text")
+  displayOrder Int      @default(0) @map("display_order")
+  isPrimary    Boolean  @default(false) @map("is_primary")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_images")
+}
+
+model ProductVariant {
+  id                String   @id @default(uuid())
+  productId         String   @map("product_id")
+  sku               String   @unique
+  name              String
+  price             Decimal  @db.Decimal(10, 2)
+  compareAtPrice    Decimal? @map("compare_at_price") @db.Decimal(10, 2)
+  stockQuantity     Int      @default(0) @map("stock_quantity")
+  lowStockThreshold Int      @default(10) @map("low_stock_threshold")
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  product    Product                  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  attributes ProductVariantAttribute[]
+  cartItems  CartItem[]
+
+  @@map("product_variants")
+}
+
+model ProductVariantAttribute {
+  id               String @id @default(uuid())
+  productVariantId String @map("product_variant_id")
+  attributeName    String @map("attribute_name")
+  attributeValue   String @map("attribute_value")
+
+  productVariant ProductVariant @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
+
+  @@map("product_variant_attributes")
 }
