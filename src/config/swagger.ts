@@ -8,10 +8,13 @@ const options = {
       version: '1.0.0',
       description: 'E-Commerce Backend API',
     },
-    servers: [
-      {
-        url: 'http://localhost:5000/api',
-      },
+    servers: [{ url: 'http://localhost:5000/api' }],
+    tags: [
+      { name: 'Auth', description: 'Authentication endpoints' },
+      { name: 'Users', description: 'User profile and address management' },
+      { name: 'Products', description: 'Product management endpoints' },
+      { name: 'Categories', description: 'Category management endpoints' },
+      { name: 'Cart', description: 'Shopping cart management' },
     ],
     components: {
       securitySchemes: {
@@ -19,18 +22,63 @@ const options = {
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'JWT',
-          description: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI1MjI4YjExZC1mODJmLTRlZTEtODlhNy0zOTk5NDU0Mzk1NzMiLCJyb2xlIjoiQURNSU4iLCJpYXQiOjE3ODIyOTI4OTYsImV4cCI6MTc4MjM3OTI5Nn0.MfeYqoRNsnCLjQTgMTsJhTbCqYxAiFH4ywhY5a9DZ0w',
+        },
+      },
+      schemas: {
+        ErrorResponse: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: false },
+            message: { type: 'string', example: 'Error message' },
+          },
+        },
+        Pagination: {
+          type: 'object',
+          properties: {
+            page: { type: 'number' },
+            limit: { type: 'number' },
+            total: { type: 'number' },
+            totalPages: { type: 'number' },
+          },
+        },
+        Cart: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            userId: { type: 'string' },
+            items: { type: 'array', items: { type: 'object' } },
+            subtotal: { type: 'number' },
+            itemCount: { type: 'number' },
+          },
+        },
+        Category: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            name: { type: 'string' },
+            slug: { type: 'string' },
+            description: { type: 'string' },
+            parentCategoryId: { type: 'string', nullable: true },
+            isActive: { type: 'boolean' },
+            childCategories: { type: 'array', items: { type: 'object' } },
+          },
+        },
+        Product: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' },
+            name: { type: 'string' },
+            slug: { type: 'string' },
+            description: { type: 'string' },
+            basePrice: { type: 'number' },
+            category: { type: 'object' },
+            images: { type: 'array', items: { type: 'object' } },
+            variants: { type: 'array', items: { type: 'object' } },
+          },
         },
       },
     },
-    // Add global security requirement
-    security: [
-      {
-        bearerAuth: [],
-      },
-    ],
   },
-  apis: ['./src/routes/*.ts'],
+  apis: ['./src/routes/*.ts', './src/modules/**/*.routes.ts'],
 };
-
 export const swaggerSpec = swaggerJsdoc(options);

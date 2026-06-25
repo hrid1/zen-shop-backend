@@ -1,10 +1,9 @@
 import prisma from "../config/database";
 
 export class CategoryService {
-    
   async getAll() {
     return prisma.category.findMany({
-      where: { isActive: true },
+      where: { isActive: true, parentCategoryId: null },
       include: {
         childCategories: {
           where: { isActive: true },
@@ -63,7 +62,9 @@ export class CategoryService {
 
   async delete(id: string) {
     const category = await prisma.category.findUnique({ where: { id } });
-    if (category) throw new Error("Category not found");
+    // console.log("Category", category)
+    if (!category) throw new Error("Category not found");
+
 
     // soft delete
     return prisma.category.update({

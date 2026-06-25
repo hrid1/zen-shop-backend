@@ -55,6 +55,8 @@ model Address {
   updatedAt    DateTime    @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shippingOrders Order[] @relation("ShippingAddress")
+  billingOrders  Order[] @relation("BillingAddress")
 
   @@map("addresses")
 }
@@ -87,19 +89,19 @@ model CartItem {
   @@map("cart_items")
 }
 
-model Order {
-  id          String   @id @default(uuid())
-  userId      String   @map("user_id")
-  orderNumber String   @unique @map("order_number")
-  status      String
-  totalAmount Decimal  @map("total_amount") @db.Decimal(10, 2)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+// model Order {
+//   id          String   @id @default(uuid())
+//   userId      String   @map("user_id")
+//   orderNumber String   @unique @map("order_number")
+//   status      String
+//   totalAmount Decimal  @map("total_amount") @db.Decimal(10, 2)
+//   createdAt   DateTime @default(now()) @map("created_at")
+//   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id])
+//   user User @relation(fields: [userId], references: [id])
 
-  @@map("orders")
-}
+//   @@map("orders")
+// }
 
 enum UserRole {
   CUSTOMER
@@ -188,6 +190,7 @@ model ProductVariant {
   product    Product                  @relation(fields: [productId], references: [id], onDelete: Cascade)
   attributes ProductVariantAttribute[]
   cartItems  CartItem[]
+  orderItems OrderItem[]
 
   @@map("product_variants")
 }
@@ -203,3 +206,78 @@ model ProductVariantAttribute {
   @@map("product_variant_attributes")
 }
 
+// order management
+model Order {
+  id                String        @id @default(uuid())
+  userId            String        @map("user_id")
+  orderNumber       String        @unique @map("order_number")
+  status            OrderStatus   @default(PENDING)
+  paymentStatus     PaymentStatus @default(PENDING) @map("payment_status")
+  shippingAddressId String        @map("shipping_address_id")
+  billingAddressId  String        @map("billing_address_id")
+  subtotal          Decimal       @db.Decimal(10, 2)
+  taxAmount         Decimal       @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  shippingCost      Decimal       @default(0) @map("shipping_cost") @db.Decimal(10, 2)
+  discountAmount    Decimal       @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  totalAmount       Decimal       @map("total_amount") @db.Decimal(10, 2)
+  couponCode        String?       @map("coupon_code")
+  notes             String?
+  cancelledAt       DateTime?     @map("cancelled_at")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  user            User                 @relation(fields: [userId], references: [id])
+  shippingAddress Address              @relation("ShippingAddress", fields: [shippingAddressId], references: [id])
+  billingAddress  Address              @relation("BillingAddress", fields: [billingAddressId], references: [id])
+  items           OrderItem[]
+  statusHistory   OrderStatusHistory[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id               String   @id @default(uuid())
+  orderId          String   @map("order_id")
+  productVariantId String   @map("product_variant_id")
+  productName      String   @map("product_name")
+  variantName      String   @map("variant_name")
+  sku              String
+  quantity         Int
+  unitPrice        Decimal  @map("unit_price") @db.Decimal(10, 2)
+  totalPrice       Decimal  @map("total_price") @db.Decimal(10, 2)
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  order          Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
+
+  @@map("order_items")
+}
+
+model OrderStatusHistory {
+  id        String      @id @default(uuid())
+  orderId   String      @map("order_id")
+  status    OrderStatus
+  notes     String?
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_status_histories")
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
