@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { OrderController } from '../controllers/order.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 
-
 const router = Router();
 const orderController = new OrderController();
 
@@ -19,7 +18,8 @@ const orderController = new OrderController();
  * @swagger
  * /orders:
  *   post:
- *     summary: Create a new order from cart
+ *     summary: Create a new order from selected cart items
+ *     description: Creates an order for the authenticated user using selected cart item IDs and saved address IDs. Ordered items are removed from the cart and stock is decremented.
  *     tags: [Orders]
  *     security:
  *       - bearerAuth: []
@@ -30,45 +30,34 @@ const orderController = new OrderController();
  *           schema:
  *             type: object
  *             required:
- *               - shippingAddress
- *               - paymentMethod
+ *               - shippingAddressId
+ *               - billingAddressId
+ *               - cartItemsIds
  *             properties:
- *               shippingAddress:
- *                 type: object
- *                 required:
- *                   - street
- *                   - city
- *                   - state
- *                   - postalCode
- *                   - country
- *                 properties:
- *                   street:
- *                     type: string
- *                     example: "123 Main St"
- *                   city:
- *                     type: string
- *                     example: "New York"
- *                   state:
- *                     type: string
- *                     example: "NY"
- *                   postalCode:
- *                     type: string
- *                     example: "10001"
- *                   country:
- *                     type: string
- *                     example: "USA"
- *               paymentMethod:
+ *               shippingAddressId:
  *                 type: string
- *                 enum: [CREDIT_CARD, DEBIT_CARD, PAYPAL, BANK_TRANSFER]
- *                 example: CREDIT_CARD
+ *                 format: uuid
+ *                 description: ID of a saved address owned by the authenticated user
+ *                 example: "01fd48bf-b4cf-4ced-9303-7bd224f2a002"
+ *               billingAddressId:
+ *                 type: string
+ *                 format: uuid
+ *                 description: ID of a saved address owned by the authenticated user
+ *                 example: "7f53a53d-0d23-48ee-92f5-4896fb791d3c"
+ *               cartItemsIds:
+ *                 type: array
+ *                 minItems: 1
+ *                 description: Cart item IDs to include in the order
+ *                 items:
+ *                   type: string
+ *                   format: uuid
+ *                 example:
+ *                   - "586f9702-01b7-4b4b-8acd-91bcb16201df"
+ *                   - "ba3f9607-1c83-4ed8-aa23-38189659cc4b"
  *               notes:
  *                 type: string
- *                 description: Order notes or special instructions
- *                 example: "Leave at front door"
- *               couponCode:
- *                 type: string
- *                 description: Coupon code for discount
- *                 example: "SAVE10"
+ *                 description: Optional order notes or special instructions
+ *                 example: "Leave at the front desk"
  *     responses:
  *       201:
  *         description: Order created successfully
@@ -81,23 +70,26 @@ const orderController = new OrderController();
  *                   type: boolean
  *                   example: true
  *                 data:
- *                   $ref: '#/components/schemas/Order'
+ *                   type: object
+ *                   description: Created order with items, shipping address, billing address, and status history
  *       400:
- *         description: Validation error or cart is empty
+ *         description: Validation error, empty cart, missing selected cart item, missing address, or insufficient stock
  *         content:
  *           application/json:
  *             schema:
  *               oneOf:
- *                 - $ref: '#/components/schemas/ValidationError'
+ *                 - type: object
+ *                   properties:
+ *                     success:
+ *                       type: boolean
+ *                       example: false
+ *                     errors:
+ *                       type: array
+ *                       items:
+ *                         type: object
  *                 - $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorized - Authentication required
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       404:
- *         description: Cart not found
  *         content:
  *           application/json:
  *             schema:
@@ -110,51 +102,13 @@ router.post('/', authenticate, (req, res) => orderController.createOrder(req as 
  * /orders:
  *   get:
  *     summary: Get current user's orders
+ *     description: Returns all orders for the authenticated user, newest first. This endpoint does not currently support pagination or filters.
  *     tags: [Orders]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           enum: [PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED, REFUNDED]
- *         description: Filter by order status
- *         example: PROCESSING
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           minimum: 1
- *           default: 1
- *         description: Page number for pagination
- *         example: 1
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           minimum: 1
- *           maximum: 50
- *           default: 10
- *         description: Number of orders per page
- *         example: 10
- *       - in: query
- *         name: startDate
- *         schema:
- *           type: string
- *           format: date
- *         description: Filter orders from this date
- *         example: 2024-01-01
- *       - in: query
- *         name: endDate
- *         schema:
- *           type: string
- *           format: date
- *         description: Filter orders until this date
- *         example: 2024-12-31
  *     responses:
  *       200:
- *         description: List of user's orders with pagination
+ *         description: List of the user's orders
  *         content:
  *           application/json:
  *             schema:
@@ -164,22 +118,18 @@ router.post('/', authenticate, (req, res) => orderController.createOrder(req as 
  *                   type: boolean
  *                   example: true
  *                 data:
- *                   type: object
- *                   properties:
- *                     orders:
- *                       type: array
- *                       items:
- *                         $ref: '#/components/schemas/OrderSummary'
- *                     pagination:
- *                       $ref: '#/components/schemas/Pagination'
- *       401:
- *         description: Unauthorized - Authentication required
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     description: Order with items and shipping address
+ *       400:
+ *         description: Bad request
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
- *       400:
- *         description: Bad request
+ *       401:
+ *         description: Unauthorized - Authentication required
  *         content:
  *           application/json:
  *             schema:
@@ -187,11 +137,142 @@ router.post('/', authenticate, (req, res) => orderController.createOrder(req as 
  */
 router.get('/', authenticate, (req, res) => orderController.getOrders(req as any, res));
 
+// ==================== ADMIN ROUTES ====================
+
+/**
+ * @swagger
+ * /orders/admin/all:
+ *   get:
+ *     summary: Get all orders (Admin only)
+ *     description: Returns every order, newest first, including user summary, items, and shipping address. This endpoint does not currently support pagination or filters.
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of all orders
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     description: Order with user summary, items, and shipping address
+ *       400:
+ *         description: Bad request
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Unauthorized - Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - Admin access required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.get('/admin/all', authenticate, authorize(['ADMIN']), (req, res) => orderController.getAllOrders(req, res));
+
+/**
+ * @swagger
+ * /orders/admin/{id}/status:
+ *   put:
+ *     summary: Update order status (Admin only)
+ *     tags: [Orders]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Order ID to update
+ *         example: "cb42ccce-1fd8-4f3a-8a4f-8f2cd145ad55"
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [PENDING, CONFIRMED, PROCESSING, SHIPPED, DELIVERED, CANCELLED, REFUNDED]
+ *                 description: New order status
+ *                 example: SHIPPED
+ *               notes:
+ *                 type: string
+ *                 description: Optional status history note
+ *                 example: "Order shipped via courier"
+ *     responses:
+ *       200:
+ *         description: Order status updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   description: Prisma transaction result containing the updated order and created status history entry
+ *                   items:
+ *                     type: object
+ *       400:
+ *         description: Validation error or order not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               oneOf:
+ *                 - type: object
+ *                   properties:
+ *                     success:
+ *                       type: boolean
+ *                       example: false
+ *                     errors:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                 - $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Unauthorized - Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Forbidden - Admin access required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.put('/admin/:id/status', authenticate, authorize(['ADMIN']), (req, res) => orderController.updateOrderStatus(req, res));
+
 /**
  * @swagger
  * /orders/{id}:
  *   get:
  *     summary: Get order by ID
+ *     description: Returns a single order for the authenticated user, including items with product variant attributes, shipping address, billing address, and status history.
  *     tags: [Orders]
  *     security:
  *       - bearerAuth: []
@@ -203,7 +284,7 @@ router.get('/', authenticate, (req, res) => orderController.getOrders(req as any
  *           type: string
  *           format: uuid
  *         description: Order ID
- *         example: 507f1f77bcf86cd799439011
+ *         example: "cb42ccce-1fd8-4f3a-8a4f-8f2cd145ad55"
  *     responses:
  *       200:
  *         description: Order details
@@ -216,15 +297,10 @@ router.get('/', authenticate, (req, res) => orderController.getOrders(req as any
  *                   type: boolean
  *                   example: true
  *                 data:
- *                   $ref: '#/components/schemas/OrderDetail'
+ *                   type: object
+ *                   description: Order with items, addresses, and status history
  *       401:
  *         description: Unauthorized - Authentication required
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       403:
- *         description: Forbidden - Not your order
  *         content:
  *           application/json:
  *             schema:
@@ -243,6 +319,7 @@ router.get('/:id', authenticate, (req, res) => orderController.getOrderById(req 
  * /orders/{id}/cancel:
  *   put:
  *     summary: Cancel an order
+ *     description: Cancels an authenticated user's order when its status is PENDING or CONFIRMED, creates a status history entry, and restores stock.
  *     tags: [Orders]
  *     security:
  *       - bearerAuth: []
@@ -254,18 +331,7 @@ router.get('/:id', authenticate, (req, res) => orderController.getOrderById(req 
  *           type: string
  *           format: uuid
  *         description: Order ID to cancel
- *         example: 507f1f77bcf86cd799439011
- *     requestBody:
- *       required: false
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               reason:
- *                 type: string
- *                 description: Cancellation reason
- *                 example: "Changed my mind"
+ *         example: "cb42ccce-1fd8-4f3a-8a4f-8f2cd145ad55"
  *     responses:
  *       200:
  *         description: Order cancelled successfully
@@ -278,233 +344,24 @@ router.get('/:id', authenticate, (req, res) => orderController.getOrderById(req 
  *                   type: boolean
  *                   example: true
  *                 data:
- *                   $ref: '#/components/schemas/Order'
- *                 message:
- *                   type: string
- *                   example: Order cancelled successfully
+ *                   type: object
+ *                   properties:
+ *                     message:
+ *                       type: string
+ *                       example: Order cancelled successfully
  *       400:
- *         description: Order cannot be cancelled (already shipped/delivered)
+ *         description: Order not found or order cannot be cancelled in its current status
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Unauthorized - Authentication required
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       403:
- *         description: Forbidden - Not your order
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       404:
- *         description: Order not found
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.put('/:id/cancel', authenticate, (req, res) => orderController.cancelOrder(req as any, res));
-
-// ==================== ADMIN ROUTES ====================
-
-/**
- * @swagger
- * /orders/admin/all:
- *   get:
- *     summary: Get all orders (Admin only)
- *     tags: [Orders]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           enum: [PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED, REFUNDED]
- *         description: Filter by order status
- *       - in: query
- *         name: userId
- *         schema:
- *           type: string
- *           format: uuid
- *         description: Filter by user ID
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           minimum: 1
- *           default: 1
- *         description: Page number for pagination
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           minimum: 1
- *           maximum: 100
- *           default: 20
- *         description: Number of orders per page
- *       - in: query
- *         name: sortBy
- *         schema:
- *           type: string
- *           enum: [createdAt, total, status]
- *           default: createdAt
- *         description: Sort field
- *       - in: query
- *         name: sortOrder
- *         schema:
- *           type: string
- *           enum: [asc, desc]
- *           default: desc
- *         description: Sort order
- *       - in: query
- *         name: startDate
- *         schema:
- *           type: string
- *           format: date
- *         description: Filter orders from this date
- *       - in: query
- *         name: endDate
- *         schema:
- *           type: string
- *           format: date
- *         description: Filter orders until this date
- *     responses:
- *       200:
- *         description: List of all orders with pagination
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   type: object
- *                   properties:
- *                     orders:
- *                       type: array
- *                       items:
- *                         $ref: '#/components/schemas/OrderAdminSummary'
- *                     pagination:
- *                       $ref: '#/components/schemas/Pagination'
- *                     summary:
- *                       type: object
- *                       properties:
- *                         totalOrders:
- *                           type: integer
- *                         totalRevenue:
- *                           type: number
- *                         pendingOrders:
- *                           type: integer
- *                         processingOrders:
- *                           type: integer
- *                         shippedOrders:
- *                           type: integer
- *                         deliveredOrders:
- *                           type: integer
- *                         cancelledOrders:
- *                           type: integer
- *       401:
- *         description: Unauthorized - Authentication required
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       403:
- *         description: Forbidden - Admin access required
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
-router.get('/admin/all', authenticate, authorize('ADMIN'), (req, res) => orderController.getAllOrders(req, res));
-
-/**
- * @swagger
- * /orders/admin/{id}/status:
- *   put:
- *     summary: Update order status (Admin only)
- *     tags: [Orders]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *         description: Order ID to update
- *         example: 507f1f77bcf86cd799439011
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - status
- *             properties:
- *               status:
- *                 type: string
- *                 enum: [PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED, REFUNDED]
- *                 description: New order status
- *                 example: SHIPPED
- *               trackingNumber:
- *                 type: string
- *                 description: Tracking number for shipped orders
- *                 example: "1Z999AA10123456784"
- *               notes:
- *                 type: string
- *                 description: Admin notes
- *                 example: "Order shipped via FedEx"
- *     responses:
- *       200:
- *         description: Order status updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 data:
- *                   $ref: '#/components/schemas/Order'
- *                 message:
- *                   type: string
- *                   example: Order status updated successfully
- *       400:
- *         description: Invalid status transition
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       401:
- *         description: Unauthorized - Authentication required
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       403:
- *         description: Forbidden - Admin access required
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       404:
- *         description: Order not found
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
-router.put('/admin/:id/status', authenticate, authorize('ADMIN'), (req, res) => orderController.updateOrderStatus(req, res));
 
 export default router;

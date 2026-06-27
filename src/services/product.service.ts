@@ -1,6 +1,7 @@
 import prisma from '../config/database';
 
 export class ProductService {
+  
   async getAll(filters: {
     categoryId?: string;
     minPrice?: number;

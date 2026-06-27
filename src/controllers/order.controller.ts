@@ -9,6 +9,7 @@ const orderService = new OrderService();
 const createOrderSchema = z.object({
   shippingAddressId: z.string().uuid(),
   billingAddressId: z.string().uuid(),
+  cartItemsIds: z.array(z.string().uuid()).nonempty(),
   notes: z.string().optional(),
 });
 

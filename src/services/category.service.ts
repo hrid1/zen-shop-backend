@@ -26,8 +26,8 @@ export class CategoryService {
   async create(data: {
     name: string;
     slug: string;
-    discription?: string;
-    parentCategoryId?: string;
+    description?: string;
+    parentCategoryId?: string | null;
     imageUrl?: string;
     displayOrder?: number;
   }) {

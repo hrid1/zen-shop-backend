@@ -6,7 +6,8 @@ const options = {
     info: {
       title: 'Zen Shop API',
       version: '1.0.0',
-      description: 'E-Commerce Backend API',
+      description: 'E-Commerce Backend API- eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIwMWZkNDhiZi1iNGNmLTRjZWQtOTMwMy03YmQyMjRmMmYwMDIiLCJyb2xlIjoiQ1VTVE9NRVIiLCJpYXQiOjE3ODI0NTQyMzUsImV4cCI6MTc4MjU0MDYzNX0.UiDvuel0caXEliuFjU4cep3PiVeIy89PnIeLovmf6UY',
+     
     },
     servers: [{ url: 'http://localhost:5000/api' }],
     tags: [

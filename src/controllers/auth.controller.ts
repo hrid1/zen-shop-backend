@@ -41,7 +41,7 @@ export class AuthController {
         return res.status(400).json({
           success: false,
           message: 'Validation error',
-          errors: error.errors,
+          errors: error.issues,
         });
       }
 
@@ -73,7 +73,7 @@ export class AuthController {
         return res.status(400).json({
           success: false,
           message: 'Validation error',
-          errors: error.errors,
+          errors: error.issues,
         });
       }
 

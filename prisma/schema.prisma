@@ -34,6 +34,9 @@ model User {
   addresses Address[]
   orders    Order[]
   cart      Cart?
+  // User model
+  reviews Review[]
+
 
   @@map("users")
 }
@@ -156,6 +159,7 @@ model Product {
   category  Category         @relation(fields: [categoryId], references: [id])
   images    ProductImage[]
   variants  ProductVariant[]
+  reviews  Review[]
 
   @@map("products")
 }
@@ -280,4 +284,38 @@ enum PaymentStatus {
   PAID
   FAILED
   REFUNDED
+}
+
+
+model Review {
+  id                  String        @id @default(uuid())
+  productId           String        @map("product_id")
+  userId              String        @map("user_id")
+  orderId             String?       @map("order_id")
+  rating              Int
+  title               String?
+  comment             String
+  isVerifiedPurchase  Boolean       @default(false) @map("is_verified_purchase")
+  isApproved          Boolean       @default(false) @map("is_approved")
+  helpfulCount        Int           @default(0) @map("helpful_count")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  product Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  images  ReviewImage[]
+
+  @@unique([productId, userId]) // one review per product per user
+  @@map("reviews")
+}
+
+model ReviewImage {
+  id        String   @id @default(uuid())
+  reviewId  String   @map("review_id")
+  imageUrl  String   @map("image_url")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@map("review_images")
 }

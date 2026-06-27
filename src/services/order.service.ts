@@ -1,17 +1,22 @@
 import prisma from "../config/database";
 
-
 export class OrderService {
-  async createOrder(userId: string, data: {
-    shippingAddressId: string;
-    billingAddressId: string;
-    notes?: string;
-  }) {
-    // Get cart with items
+  async createOrder(
+    userId: string,
+    data: {
+      shippingAddressId: string;
+      billingAddressId: string;
+      cartItemsIds: string[];
+      notes?: string;
+    },
+  ) {
     const cart = await prisma.cart.findUnique({
       where: { userId },
       include: {
         items: {
+          where: {
+            id: { in: data.cartItemsIds }, // ← only fetch selected items
+          },
           include: {
             productVariant: {
               include: { product: true },
@@ -22,19 +27,23 @@ export class OrderService {
     });
 
     if (!cart || cart.items.length === 0) {
-      throw new Error('Cart is empty');
+      throw new Error("Cart is empty");
     }
 
-    // Validate stock for all items first
+    // Validate selected items exist
+    if (cart.items.length !== data.cartItemsIds.length) {
+      throw new Error("One or more cart items not found");
+    }
+
+    // Validate stock for selected items only
     for (const item of cart.items) {
       if (item.productVariant.stockQuantity < item.quantity) {
         throw new Error(
-          `Insufficient stock for ${item.productVariant.product.name} - ${item.productVariant.name}`
+          `Insufficient stock for ${item.productVariant.product.name} - ${item.productVariant.name}`,
         );
       }
     }
 
-    // Validate addresses belong to user
     const [shippingAddress, billingAddress] = await Promise.all([
       prisma.address.findFirst({
         where: { id: data.shippingAddressId, userId },
@@ -44,33 +53,30 @@ export class OrderService {
       }),
     ]);
 
-    if (!shippingAddress) throw new Error('Shipping address not found');
-    if (!billingAddress) throw new Error('Billing address not found');
+    if (!shippingAddress) throw new Error("Shipping address not found");
+    if (!billingAddress) throw new Error("Billing address not found");
 
-    // Calculate totals
+    // Calculate totals from selected items only
     const subtotal = cart.items.reduce((sum, item) => {
       return sum + Number(item.priceAtAddition) * item.quantity;
     }, 0);
 
-    const taxAmount = subtotal * 0.1;       // 10% tax
-    const shippingCost = subtotal > 100 ? 0 : 10; // free shipping over $100
+    const taxAmount = subtotal * 0.1;
+    const shippingCost = subtotal > 100 ? 0 : 10;
     const totalAmount = subtotal + taxAmount + shippingCost;
 
-    // Generate order number
     const orderNumber = `ORD-${Date.now()}-${Math.random()
       .toString(36)
       .substring(2, 7)
       .toUpperCase()}`;
 
-    // Create order in a transaction
     const order = await prisma.$transaction(async (tx) => {
-      // Create order
       const newOrder = await tx.order.create({
         data: {
-          userId,
+          user: { connect: { id: userId } }, // ← connect
           orderNumber,
-          shippingAddressId: data.shippingAddressId,
-          billingAddressId: data.billingAddressId,
+          shippingAddress: { connect: { id: data.shippingAddressId } },
+          billingAddress: { connect: { id: data.billingAddressId } },
           subtotal,
           taxAmount,
           shippingCost,
@@ -88,10 +94,7 @@ export class OrderService {
             })),
           },
           statusHistory: {
-            create: {
-              status: 'PENDING',
-              notes: 'Order placed',
-            },
+            create: { status: "PENDING", notes: "Order placed" },
           },
         },
         include: {
@@ -102,7 +105,7 @@ export class OrderService {
         },
       });
 
-      // Deduct stock for each variant
+      // Deduct stock for selected items only
       for (const item of cart.items) {
         await tx.productVariant.update({
           where: { id: item.productVariantId },
@@ -110,15 +113,19 @@ export class OrderService {
         });
       }
 
-      // Clear cart
-      await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+      // Remove only ordered items from cart
+      await tx.cartItem.deleteMany({
+        where: {
+          cartId: cart.id,
+          id: { in: data.cartItemsIds },
+        },
+      });
 
       return newOrder;
     });
 
     return order;
   }
-
   async getOrders(userId: string) {
     return prisma.order.findMany({
       where: { userId },
@@ -126,7 +133,7 @@ export class OrderService {
         items: true,
         shippingAddress: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -143,11 +150,11 @@ export class OrderService {
         },
         shippingAddress: true,
         billingAddress: true,
-        statusHistory: { orderBy: { createdAt: 'desc' } },
+        statusHistory: { orderBy: { createdAt: "desc" } },
       },
     });
 
-    if (!order) throw new Error('Order not found');
+    if (!order) throw new Error("Order not found");
     return order;
   }
 
@@ -157,9 +164,9 @@ export class OrderService {
       include: { items: true },
     });
 
-    if (!order) throw new Error('Order not found');
+    if (!order) throw new Error("Order not found");
 
-    if (!['PENDING', 'CONFIRMED'].includes(order.status)) {
+    if (!["PENDING", "CONFIRMED"].includes(order.status)) {
       throw new Error(`Cannot cancel order with status ${order.status}`);
     }
 
@@ -168,7 +175,7 @@ export class OrderService {
       await tx.order.update({
         where: { id: orderId },
         data: {
-          status: 'CANCELLED',
+          status: "CANCELLED",
           cancelledAt: new Date(),
         },
       });
@@ -176,8 +183,8 @@ export class OrderService {
       await tx.orderStatusHistory.create({
         data: {
           orderId,
-          status: 'CANCELLED',
-          notes: 'Cancelled by customer',
+          status: "CANCELLED",
+          notes: "Cancelled by customer",
         },
       });
 
@@ -190,13 +197,13 @@ export class OrderService {
       }
     });
 
-    return { message: 'Order cancelled successfully' };
+    return { message: "Order cancelled successfully" };
   }
 
   // Admin only
   async updateOrderStatus(orderId: string, status: string, notes?: string) {
     const order = await prisma.order.findUnique({ where: { id: orderId } });
-    if (!order) throw new Error('Order not found');
+    if (!order) throw new Error("Order not found");
 
     return prisma.$transaction([
       prisma.order.update({
@@ -212,11 +219,13 @@ export class OrderService {
   async getAllOrders() {
     return prisma.order.findMany({
       include: {
-        user: { select: { id: true, email: true, firstName: true, lastName: true } },
+        user: {
+          select: { id: true, email: true, firstName: true, lastName: true },
+        },
         items: true,
         shippingAddress: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 }

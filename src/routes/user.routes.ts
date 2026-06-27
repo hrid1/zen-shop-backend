@@ -25,23 +25,25 @@ router.use(authenticate);
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: User profile data retrieved successfully
+ *         description: User profile retrieved successfully
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 status:
- *                   type: string
- *                   example: success
+ *                 success:
+ *                   type: boolean
+ *                   example: true
  *                 data:
  *                   type: object
  *                   properties:
  *                     id:
  *                       type: string
- *                       example: user_123
+ *                       format: uuid
+ *                       example: "01fd48bf-b4cf-4ced-9303-7bd224f2a002"
  *                     email:
  *                       type: string
+ *                       format: email
  *                       example: user@example.com
  *                     firstName:
  *                       type: string
@@ -51,28 +53,30 @@ router.use(authenticate);
  *                       example: Doe
  *                     phoneNumber:
  *                       type: string
- *                       example: +1234567890
+ *                       nullable: true
+ *                       example: "+1234567890"
+ *                     role:
+ *                       type: string
+ *                       enum: [CUSTOMER, ADMIN, VENDOR]
+ *                       example: CUSTOMER
+ *                     emailVerified:
+ *                       type: boolean
+ *                       example: false
  *                     createdAt:
  *                       type: string
  *                       format: date-time
- *                     updatedAt:
- *                       type: string
- *                       format: date-time
  *       401:
- *         description: Unauthorized - Invalid or missing authentication token
+ *         description: Unauthorized - Authentication required
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: error
- *                 message:
- *                   type: string
- *                   example: Authentication required
- *       500:
- *         description: Internal server error
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: User not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/profile', (req, res) => userController.getProfile(req as any, res));
 
@@ -93,16 +97,15 @@ router.get('/profile', (req, res) => userController.getProfile(req as any, res))
  *             properties:
  *               firstName:
  *                 type: string
+ *                 minLength: 1
  *                 example: John
- *                 description: User's first name
  *               lastName:
  *                 type: string
+ *                 minLength: 1
  *                 example: Doe
- *                 description: User's last name
  *               phoneNumber:
  *                 type: string
- *                 example: +1234567890
- *                 description: User's phone number with country code
+ *                 example: "+1234567890"
  *     responses:
  *       200:
  *         description: Profile updated successfully
@@ -111,47 +114,50 @@ router.get('/profile', (req, res) => userController.getProfile(req as any, res))
  *             schema:
  *               type: object
  *               properties:
- *                 status:
- *                   type: string
- *                   example: success
+ *                 success:
+ *                   type: boolean
+ *                   example: true
  *                 data:
  *                   type: object
  *                   properties:
  *                     id:
  *                       type: string
- *                       example: user_123
+ *                       format: uuid
  *                     email:
  *                       type: string
- *                       example: user@example.com
+ *                       format: email
  *                     firstName:
  *                       type: string
- *                       example: John
  *                     lastName:
  *                       type: string
- *                       example: Doe
  *                     phoneNumber:
  *                       type: string
- *                       example: +1234567890
- *                     updatedAt:
+ *                       nullable: true
+ *                     role:
  *                       type: string
- *                       format: date-time
+ *                       enum: [CUSTOMER, ADMIN, VENDOR]
  *       400:
- *         description: Bad request - Invalid input data
+ *         description: Validation error or user not found
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: error
- *                 message:
- *                   type: string
- *                   example: Invalid phone number format
+ *               oneOf:
+ *                 - type: object
+ *                   properties:
+ *                     success:
+ *                       type: boolean
+ *                       example: false
+ *                     errors:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                 - $ref: '#/components/schemas/ErrorResponse'
  *       401:
- *         description: Unauthorized - Invalid or missing authentication token
- *       500:
- *         description: Internal server error
+ *         description: Unauthorized - Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.put('/profile', (req, res) => userController.updateProfile(req as any, res));
 
@@ -159,7 +165,8 @@ router.put('/profile', (req, res) => userController.updateProfile(req as any, re
  * @swagger
  * /users/addresses:
  *   get:
- *     summary: Get all addresses for current user
+ *     summary: Get current user's addresses
+ *     description: Returns all saved addresses for the authenticated user, newest first.
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -171,9 +178,9 @@ router.put('/profile', (req, res) => userController.updateProfile(req as any, re
  *             schema:
  *               type: object
  *               properties:
- *                 status:
- *                   type: string
- *                   example: success
+ *                 success:
+ *                   type: boolean
+ *                   example: true
  *                 data:
  *                   type: array
  *                   items:
@@ -181,35 +188,50 @@ router.put('/profile', (req, res) => userController.updateProfile(req as any, re
  *                     properties:
  *                       id:
  *                         type: string
- *                         example: addr_123
+ *                         format: uuid
  *                       userId:
  *                         type: string
- *                         example: user_123
- *                       street:
+ *                         format: uuid
+ *                       addressType:
  *                         type: string
- *                         example: 123 Main Street
+ *                         enum: [SHIPPING, BILLING, BOTH]
+ *                       fullName:
+ *                         type: string
+ *                       phoneNumber:
+ *                         type: string
+ *                       addressLine1:
+ *                         type: string
+ *                       addressLine2:
+ *                         type: string
+ *                         nullable: true
  *                       city:
  *                         type: string
- *                         example: New York
  *                       state:
  *                         type: string
- *                         example: NY
- *                       zipCode:
+ *                       postalCode:
  *                         type: string
- *                         example: 10001
  *                       country:
  *                         type: string
- *                         example: USA
  *                       isDefault:
  *                         type: boolean
- *                         example: true
  *                       createdAt:
  *                         type: string
  *                         format: date-time
+ *                       updatedAt:
+ *                         type: string
+ *                         format: date-time
+ *       400:
+ *         description: Bad request
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
- *         description: Unauthorized - Invalid or missing authentication token
- *       500:
- *         description: Internal server error
+ *         description: Unauthorized - Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/addresses', (req, res) => userController.getAddresses(req as any, res));
 
@@ -218,6 +240,7 @@ router.get('/addresses', (req, res) => userController.getAddresses(req as any, r
  * /users/addresses:
  *   post:
  *     summary: Create a new address for current user
+ *     description: Creates a saved address. When isDefault is true, all other addresses for the user are unset as default first.
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -228,44 +251,53 @@ router.get('/addresses', (req, res) => userController.getAddresses(req as any, r
  *           schema:
  *             type: object
  *             required:
- *               - street
+ *               - addressType
+ *               - fullName
+ *               - phoneNumber
+ *               - addressLine1
  *               - city
  *               - state
- *               - zipCode
+ *               - postalCode
  *               - country
  *             properties:
- *               street:
+ *               addressType:
  *                 type: string
- *                 example: 123 Main Street
- *                 description: Street address
- *               apartment:
+ *                 enum: [SHIPPING, BILLING, BOTH]
+ *                 example: SHIPPING
+ *               fullName:
  *                 type: string
- *                 example: Apt 4B
- *                 description: Apartment or suite number (optional)
+ *                 minLength: 1
+ *                 example: John Doe
+ *               phoneNumber:
+ *                 type: string
+ *                 minLength: 1
+ *                 example: "+1234567890"
+ *               addressLine1:
+ *                 type: string
+ *                 minLength: 1
+ *                 example: "123 Main Street"
+ *               addressLine2:
+ *                 type: string
+ *                 example: "Apt 4B"
  *               city:
  *                 type: string
+ *                 minLength: 1
  *                 example: New York
- *                 description: City
  *               state:
  *                 type: string
+ *                 minLength: 1
  *                 example: NY
- *                 description: State or province
- *               zipCode:
+ *               postalCode:
  *                 type: string
- *                 example: 10001
- *                 description: Postal/ZIP code
+ *                 minLength: 1
+ *                 example: "10001"
  *               country:
  *                 type: string
+ *                 minLength: 1
  *                 example: USA
- *                 description: Country
  *               isDefault:
  *                 type: boolean
  *                 example: true
- *                 description: Set as default address
- *               label:
- *                 type: string
- *                 example: Home
- *                 description: Address label (e.g., Home, Work)
  *     responses:
  *       201:
  *         description: Address created successfully
@@ -274,62 +306,34 @@ router.get('/addresses', (req, res) => userController.getAddresses(req as any, r
  *             schema:
  *               type: object
  *               properties:
- *                 status:
- *                   type: string
- *                   example: success
+ *                 success:
+ *                   type: boolean
+ *                   example: true
  *                 data:
  *                   type: object
- *                   properties:
- *                     id:
- *                       type: string
- *                       example: addr_123
- *                     userId:
- *                       type: string
- *                       example: user_123
- *                     street:
- *                       type: string
- *                       example: 123 Main Street
- *                     apartment:
- *                       type: string
- *                       example: Apt 4B
- *                     city:
- *                       type: string
- *                       example: New York
- *                     state:
- *                       type: string
- *                       example: NY
- *                     zipCode:
- *                       type: string
- *                       example: 10001
- *                     country:
- *                       type: string
- *                       example: USA
- *                     isDefault:
- *                       type: boolean
- *                       example: true
- *                     label:
- *                       type: string
- *                       example: Home
- *                     createdAt:
- *                       type: string
- *                       format: date-time
+ *                   description: Created address
  *       400:
- *         description: Bad request - Invalid input data
+ *         description: Validation error
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: error
- *                 message:
- *                   type: string
- *                   example: All required fields must be provided
+ *               oneOf:
+ *                 - type: object
+ *                   properties:
+ *                     success:
+ *                       type: boolean
+ *                       example: false
+ *                     errors:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                 - $ref: '#/components/schemas/ErrorResponse'
  *       401:
- *         description: Unauthorized - Invalid or missing authentication token
- *       500:
- *         description: Internal server error
+ *         description: Unauthorized - Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post('/addresses', (req, res) => userController.createAddress(req as any, res));
 
@@ -338,6 +342,7 @@ router.post('/addresses', (req, res) => userController.createAddress(req as any,
  * /users/addresses/{id}:
  *   put:
  *     summary: Update an existing address
+ *     description: Updates fields on an address owned by the authenticated user. When isDefault is true, all other addresses for the user are unset as default first.
  *     tags: [Users]
  *     security:
  *       - bearerAuth: []
@@ -347,7 +352,9 @@ router.post('/addresses', (req, res) => userController.createAddress(req as any,
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
  *         description: Address ID
+ *         example: "7f53a53d-0d23-48ee-92f5-4896fb791d3c"
  *     requestBody:
  *       required: true
  *       content:
@@ -355,30 +362,44 @@ router.post('/addresses', (req, res) => userController.createAddress(req as any,
  *           schema:
  *             type: object
  *             properties:
- *               street:
+ *               addressType:
  *                 type: string
- *                 example: 456 Oak Avenue
- *               apartment:
+ *                 enum: [SHIPPING, BILLING, BOTH]
+ *                 example: BOTH
+ *               fullName:
  *                 type: string
- *                 example: Suite 2C
+ *                 minLength: 1
+ *                 example: Jane Doe
+ *               phoneNumber:
+ *                 type: string
+ *                 minLength: 1
+ *                 example: "+1234567890"
+ *               addressLine1:
+ *                 type: string
+ *                 minLength: 1
+ *                 example: "456 Oak Avenue"
+ *               addressLine2:
+ *                 type: string
+ *                 example: "Suite 2C"
  *               city:
  *                 type: string
+ *                 minLength: 1
  *                 example: Los Angeles
  *               state:
  *                 type: string
+ *                 minLength: 1
  *                 example: CA
- *               zipCode:
+ *               postalCode:
  *                 type: string
- *                 example: 90001
+ *                 minLength: 1
+ *                 example: "90001"
  *               country:
  *                 type: string
+ *                 minLength: 1
  *                 example: USA
  *               isDefault:
  *                 type: boolean
  *                 example: false
- *               label:
- *                 type: string
- *                 example: Work
  *     responses:
  *       200:
  *         description: Address updated successfully
@@ -387,61 +408,24 @@ router.post('/addresses', (req, res) => userController.createAddress(req as any,
  *             schema:
  *               type: object
  *               properties:
- *                 status:
- *                   type: string
- *                   example: success
+ *                 success:
+ *                   type: boolean
+ *                   example: true
  *                 data:
  *                   type: object
- *                   properties:
- *                     id:
- *                       type: string
- *                       example: addr_123
- *                     userId:
- *                       type: string
- *                       example: user_123
- *                     street:
- *                       type: string
- *                       example: 456 Oak Avenue
- *                     city:
- *                       type: string
- *                       example: Los Angeles
- *                     state:
- *                       type: string
- *                       example: CA
- *                     zipCode:
- *                       type: string
- *                       example: 90001
- *                     country:
- *                       type: string
- *                       example: USA
- *                     isDefault:
- *                       type: boolean
- *                       example: false
- *                     label:
- *                       type: string
- *                       example: Work
- *                     updatedAt:
- *                       type: string
- *                       format: date-time
+ *                   description: Updated address
  *       400:
- *         description: Bad request - Invalid input data
- *       401:
- *         description: Unauthorized - Invalid or missing authentication token
- *       404:
- *         description: Address not found
+ *         description: Validation error or address not found
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: error
- *                 message:
- *                   type: string
- *                   example: Address not found
- *       500:
- *         description: Internal server error
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Unauthorized - Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.put('/addresses/:id', (req, res) => userController.updateAddress(req as any, res));
 
@@ -459,7 +443,9 @@ router.put('/addresses/:id', (req, res) => userController.updateAddress(req as a
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
  *         description: Address ID
+ *         example: "7f53a53d-0d23-48ee-92f5-4896fb791d3c"
  *     responses:
  *       200:
  *         description: Address deleted successfully
@@ -468,29 +454,27 @@ router.put('/addresses/:id', (req, res) => userController.updateAddress(req as a
  *             schema:
  *               type: object
  *               properties:
- *                 status:
- *                   type: string
- *                   example: success
- *                 message:
- *                   type: string
- *                   example: Address deleted successfully
- *       401:
- *         description: Unauthorized - Invalid or missing authentication token
- *       404:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     message:
+ *                       type: string
+ *                       example: Address deleted
+ *       400:
  *         description: Address not found
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: error
- *                 message:
- *                   type: string
- *                   example: Address not found
- *       500:
- *         description: Internal server error
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Unauthorized - Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.delete('/addresses/:id', (req, res) => userController.deleteAddress(req as any, res));
 
