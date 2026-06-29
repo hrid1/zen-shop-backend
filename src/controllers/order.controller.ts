@@ -1,8 +1,8 @@
-import { Request, Response } from 'express';
+import { Request, Response } from "express";
 
-import { z } from 'zod';
-import { OrderService } from '../services/order.service';
-import { AuthRequest } from '../middleware/auth.middleware';
+import { z } from "zod";
+import { OrderService } from "../services/order.service";
+import { AuthRequest } from "../middleware/auth.middleware";
 
 const orderService = new OrderService();
 
@@ -14,7 +14,15 @@ const createOrderSchema = z.object({
 });
 
 const updateStatusSchema = z.object({
-  status: z.enum(['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED']),
+  status: z.enum([
+    "PENDING",
+    "CONFIRMED",
+    "PROCESSING",
+    "SHIPPED",
+    "DELIVERED",
+    "CANCELLED",
+    "REFUNDED",
+  ]),
   notes: z.string().optional(),
 });
 
@@ -43,7 +51,10 @@ export class OrderController {
 
   async getOrderById(req: AuthRequest, res: Response) {
     try {
-      const order = await orderService.getOrderById(req.user!.userId, req.params.id as string);
+      const order = await orderService.getOrderById(
+        req.user!.userId,
+        req.params.id as string,
+      );
       return res.json({ success: true, data: order });
     } catch (error: any) {
       return res.status(404).json({ success: false, message: error.message });
@@ -52,7 +63,10 @@ export class OrderController {
 
   async cancelOrder(req: AuthRequest, res: Response) {
     try {
-      const result = await orderService.cancelOrder(req.user!.userId, req.params.id as string);
+      const result = await orderService.cancelOrder(
+        req.user!.userId,
+        req.params.id as string,
+      );
       return res.json({ success: true, data: result });
     } catch (error: any) {
       return res.status(400).json({ success: false, message: error.message });
@@ -72,7 +86,11 @@ export class OrderController {
   async updateOrderStatus(req: Request, res: Response) {
     try {
       const { status, notes } = updateStatusSchema.parse(req.body);
-      const result = await orderService.updateOrderStatus(req.params.id as string, status, notes);
+      const result = await orderService.updateOrderStatus(
+        req.params.id as string,
+        status,
+        notes,
+      );
       return res.json({ success: true, data: result });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
